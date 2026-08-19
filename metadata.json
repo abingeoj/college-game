@@ -1,0 +1,6 @@
+{
+  "name": "College Runner",
+  "description": "Four-Year Engineering College Endless Runner Game with character selection, academic milestones (Projects, Exams, Assignments, Internships), supply obstacle dodging, and Become an Engineer graduation loop.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
