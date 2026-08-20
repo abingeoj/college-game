@@ -90,6 +90,12 @@ fun CollegeRunnerApp(modifier: Modifier = Modifier) {
     val soundSynthesizer = remember { SoundSynthesizer(context) }
     val engine = remember { GameEngine(preferences, soundSynthesizer) }
 
+    androidx.compose.runtime.DisposableEffect(soundSynthesizer) {
+        onDispose {
+            soundSynthesizer.release()
+        }
+    }
+
     val gameState by engine.gameState.collectAsState()
     var showCareerStats by remember { mutableStateOf(false) }
 

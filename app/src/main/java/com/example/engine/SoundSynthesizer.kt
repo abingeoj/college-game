@@ -10,6 +10,8 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.sin
@@ -19,12 +21,54 @@ class SoundSynthesizer(context: Context) {
     private val sampleRate = 22050
     private var isEnabled = true
 
+    private val audioChannel = Channel<ShortArray>(capacity = 64)
+    private var audioTrack: AudioTrack? = null
+
     private val vibrator: Vibrator? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
         vibratorManager?.defaultVibrator
     } else {
         @Suppress("DEPRECATION")
         context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+    }
+
+    init {
+        scope.launch {
+            try {
+                val minBufferSize = AudioTrack.getMinBufferSize(
+                    sampleRate,
+                    AudioFormat.CHANNEL_OUT_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT
+                ).coerceAtLeast(sampleRate / 2) // ~500ms buffer capacity
+
+                val track = AudioTrack.Builder()
+                    .setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_GAME)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build()
+                    )
+                    .setAudioFormat(
+                        AudioFormat.Builder()
+                            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                            .setSampleRate(sampleRate)
+                            .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                            .build()
+                    )
+                    .setBufferSizeInBytes(minBufferSize)
+                    .setTransferMode(AudioTrack.MODE_STREAM)
+                    .build()
+
+                audioTrack = track
+                track.play()
+
+                for (buffer in audioChannel) {
+                    if (isEnabled && track.state == AudioTrack.STATE_INITIALIZED) {
+                        track.write(buffer, 0, buffer.size, AudioTrack.WRITE_BLOCKING)
+                    }
+                }
+            } catch (_: Exception) {}
+        }
     }
 
     fun setSoundEnabled(enabled: Boolean) {
@@ -191,34 +235,17 @@ class SoundSynthesizer(context: Context) {
     }
 
     private fun playPcm(buffer: ShortArray) {
-        try {
-            val audioTrack = AudioTrack.Builder()
-                .setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_GAME)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build()
-                )
-                .setAudioFormat(
-                    AudioFormat.Builder()
-                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                        .setSampleRate(sampleRate)
-                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                        .build()
-                )
-                .setBufferSizeInBytes(buffer.size * 2)
-                .setTransferMode(AudioTrack.MODE_STATIC)
-                .build()
+        if (!isEnabled) return
+        audioChannel.trySend(buffer)
+    }
 
-            audioTrack.write(buffer, 0, buffer.size)
-            audioTrack.play()
-            scope.launch {
-                kotlinx.coroutines.delay((buffer.size * 1000L / sampleRate) + 50)
-                try {
-                    audioTrack.stop()
-                    audioTrack.release()
-                } catch (_: Exception) {}
-            }
+    fun release() {
+        try {
+            audioChannel.close()
+            audioTrack?.stop()
+            audioTrack?.release()
+            audioTrack = null
+            scope.cancel()
         } catch (_: Exception) {}
     }
 }

@@ -1004,7 +1004,7 @@ private fun DrawScope.drawHeadAndAccessories(
         size = Size(headRadius * 2.3f, headRadius * 2.1f)
     )
 
-    // Baseball Cap (If character Rahul/Rusher)
+    // Baseball Cap (If character YouTuber)
     if (character.hasCap) {
         drawRoundRect(
             color = Color(0xFFD97706),
@@ -1021,7 +1021,7 @@ private fun DrawScope.drawHeadAndAccessories(
         )
     }
 
-    // Sunglasses (Swagger Arjun) or Glasses (Champ Vikram / Chaser Aditya)
+    // Sunglasses (Srihari) or Glasses (Rino / Aditya)
     if (character.hasSunglasses) {
         // Dark aviator shades
         drawRoundRect(
